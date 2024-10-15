@@ -331,13 +331,13 @@ typedef struct
 #else
 #error "No DRBG available"
 #endif
-} rng_context_t; // td-otto
+} rng_context_t; // th-otto
 
 typedef struct
 {
   mbedtls_pk_context pk;
   rng_context_t rng;
-} my_pk_context; // td-otto
+} my_pk_context; // th-otto
 
 unsigned long CDECL get_sizeof_pk_context_struct() { return (unsigned long)sizeof(my_pk_context); }
 
@@ -404,7 +404,7 @@ typedef struct
 {
   mbedtls_ssl_config conf;
   mbedtls_ssl_context ssl;
-} my_ssl_context; // td-otto
+} my_ssl_context; // th-otto
 
 unsigned long CDECL get_sizeof_ssl_context_struct() { return (unsigned long)sizeof(my_ssl_context); }
 
@@ -446,7 +446,7 @@ int CDECL ldg_ssl_init(my_ssl_context *ssl, mbedtls_ctr_drbg_context *ctr, int *
 
   return 0;
   
-exit: // td-otto
+exit: // th-otto
   mbedtls_ssl_free(&ssl->ssl);
   mbedtls_ssl_config_free(&ssl->conf);
   return ret;
