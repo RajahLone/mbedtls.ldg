@@ -5,8 +5,8 @@
 #include MBEDTLS_CONFIG_FILE
 #endif
 
+#define MBEDTLS_DEBUG_C
 #define MBEDTLS_ALLOW_PRIVATE_ACCESS
-#define MBEDTLS_CTR_DRBG_C
 
 #include <string.h>
 #include <stdlib.h>
@@ -93,7 +93,7 @@ void CDECL set_aes_global(short *aes_global) { ldg_aes_global = aes_global; ldg_
 #if defined(MBEDTLS_DEBUG_C)
 static void CDECL my_debug(void *ctx, int level, const char *filename, int line, const char *str)
 {
-  (void) Cconws(str);
+	(void) Cconws(str);
   (void) Cconws("\r\n");
 }
 #endif
@@ -313,7 +313,11 @@ unsigned long CDECL get_sizeof_x509_crt_struct() { return (unsigned long)sizeof(
 
 void CDECL ldg_x509_crt_init(mbedtls_x509_crt *crt) { mbedtls_x509_crt_init(crt); }
 
-int CDECL ldg_x509_crt_parse(mbedtls_x509_crt *chain, const unsigned char *buf, size_t len) { return mbedtls_x509_crt_parse(chain, buf, len); }
+int CDECL ldg_x509_crt_parse(mbedtls_x509_crt *chain, const unsigned char *buf, size_t len)
+{
+  /* updated X509_crt_parse() need a C-string in buf, ie buf[len - 1] == '\0', evenif it's coming from big cacert.pem file */
+  return mbedtls_x509_crt_parse(chain, buf, len);
+}
 
 int CDECL ldg_x509_crt_info(char *buf, size_t size, const mbedtls_x509_crt *crt) { return mbedtls_x509_crt_info(buf, size, "", crt); }
 
@@ -321,23 +325,8 @@ void CDECL ldg_x509_crt_free(mbedtls_x509_crt *crt) { mbedtls_x509_crt_free(crt)
 
 /* private key functions (rng functions by th-otto) */
 
-typedef struct
-{
-  mbedtls_entropy_context entropy;
-#if defined(MBEDTLS_CTR_DRBG_C)
-  mbedtls_ctr_drbg_context drbg;
-#elif defined(MBEDTLS_HMAC_DRBG_C)
-  mbedtls_hmac_drbg_context drbg;
-#else
-#error "No DRBG available"
-#endif
-} rng_context_t; // th-otto
-
-typedef struct
-{
-  mbedtls_pk_context pk;
-  rng_context_t rng;
-} my_pk_context; // th-otto
+typedef struct { mbedtls_ctr_drbg_context drbg_ctx; mbedtls_entropy_context entr_ctx; } rng_context_t; // th-otto
+typedef struct { mbedtls_pk_context pk; rng_context_t rng; } my_pk_context; // th-otto
 
 unsigned long CDECL get_sizeof_pk_context_struct() { return (unsigned long)sizeof(my_pk_context); }
 
@@ -345,30 +334,19 @@ void CDECL ldg_pk_init(my_pk_context *pk) { mbedtls_pk_init(&pk->pk); }
 
 void rng_init(rng_context_t *rng)
 {
-#if defined(MBEDTLS_CTR_DRBG_C)
-  mbedtls_ctr_drbg_init(&rng->drbg);
-#elif defined(MBEDTLS_HMAC_DRBG_C)
-  mbedtls_hmac_drbg_init(&rng->drbg);
-#endif
-
-  mbedtls_entropy_init(&rng->entropy);
+  mbedtls_ctr_drbg_init(&rng->drbg_ctx);
+  mbedtls_entropy_init(&rng->entr_ctx);
 }
 
 static int rng_get(void *p_rng, unsigned char *output, size_t output_len)
 {
   rng_context_t *rng = p_rng;
-
-#if defined(MBEDTLS_CTR_DRBG_C)
-  return mbedtls_ctr_drbg_random(&rng->drbg, output, output_len);
-#elif defined(MBEDTLS_HMAC_DRBG_C)
-  return mbedtls_hmac_drbg_random(&rng->drbg, output, output_len);
-#endif
+  return mbedtls_ctr_drbg_random(&rng->drbg_ctx, output, output_len);
 }
 
 int CDECL ldg_pk_parse(my_pk_context *pk, const unsigned char *key, size_t keylen)
 {
   rng_init(&pk->rng);
-  
   return mbedtls_pk_parse_key(&pk->pk, key, keylen, NULL, 0, rng_get, &pk->rng);
 }
 
@@ -377,38 +355,29 @@ void CDECL ldg_pk_free(my_pk_context *pk) { mbedtls_pk_free(&pk->pk); }
 /* entropy functions */
 
 unsigned long CDECL get_sizeof_entropy_context_struct() { return (unsigned long)sizeof(mbedtls_entropy_context); }
-
 unsigned long CDECL get_sizeof_ctr_drbg_context_struct() { return (unsigned long)sizeof(mbedtls_ctr_drbg_context); }
 
-int ldg_entropy_init(mbedtls_entropy_context *ctx, mbedtls_ctr_drbg_context *ctr, const char *app_name)
+int ldg_entropy_init(mbedtls_entropy_context *entr_ctx, mbedtls_ctr_drbg_context *drbg_ctx, const char *app_name)
 {
-  mbedtls_entropy_init(ctx);
-  mbedtls_ctr_drbg_init(ctr);
+  mbedtls_ctr_drbg_init(drbg_ctx);
+  mbedtls_entropy_init(entr_ctx);
   
-#if defined(MBEDTLS_USE_PSA_CRYPTO)
-  if (psa_crypto_init() != PSA_SUCCESS) { return MBEDTLS_ERR_SSL_HW_ACCEL_FAILED; }
-#endif
-
-  return mbedtls_ctr_drbg_seed(ctr, mbedtls_entropy_func, ctx, (const unsigned char *) app_name, strlen(app_name));
+  return mbedtls_ctr_drbg_seed(drbg_ctx, mbedtls_entropy_func, entr_ctx, (const unsigned char *) app_name, strlen(app_name));
 }
 
-void CDECL ldg_entropy_free(mbedtls_entropy_context *ctx, mbedtls_ctr_drbg_context *ctr)
+void CDECL ldg_entropy_free(mbedtls_entropy_context *entr_ctx, mbedtls_ctr_drbg_context *drbg_ctx)
 {
-  if (ctr != NULL) { mbedtls_ctr_drbg_free(ctr); }
-  if (ctx != NULL) { mbedtls_entropy_free(ctx); }
+  if (drbg_ctx != NULL) { mbedtls_ctr_drbg_free(drbg_ctx); }
+  if (entr_ctx != NULL) { mbedtls_entropy_free(entr_ctx); }
 }
 
 /* ssl layer functions */
 
-typedef struct
-{
-  mbedtls_ssl_config conf;
-  mbedtls_ssl_context ssl;
-} my_ssl_context; // th-otto
+typedef struct { mbedtls_ssl_config conf; mbedtls_ssl_context ssl; } my_ssl_context; // th-otto
 
 unsigned long CDECL get_sizeof_ssl_context_struct() { return (unsigned long)sizeof(my_ssl_context); }
 
-int CDECL ldg_ssl_init(my_ssl_context *ssl, mbedtls_ctr_drbg_context *ctr, int *server_fd, const char *servername, mbedtls_x509_crt *cacert, mbedtls_x509_crt *cert, mbedtls_pk_context *pk)
+int CDECL ldg_ssl_init(my_ssl_context *ssl, mbedtls_ctr_drbg_context *drbg_ctx, int *server_fd, const char *servername, mbedtls_x509_crt *cacert, mbedtls_x509_crt *cert, my_pk_context *pk)
 {
   int ret;
   
@@ -417,10 +386,9 @@ int CDECL ldg_ssl_init(my_ssl_context *ssl, mbedtls_ctr_drbg_context *ctr, int *
   ret = mbedtls_ssl_config_defaults(&ssl->conf, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
   if (ret != 0) { goto exit; }
   
-  mbedtls_ssl_conf_endpoint(&ssl->conf, MBEDTLS_SSL_IS_CLIENT);
-  mbedtls_ssl_set_hs_authmode(&ssl->ssl, (cacert == NULL) ? MBEDTLS_SSL_VERIFY_NONE : MBEDTLS_SSL_VERIFY_OPTIONAL);
+  mbedtls_ssl_conf_authmode(&ssl->conf, (cacert == NULL) ? MBEDTLS_SSL_VERIFY_NONE : MBEDTLS_SSL_VERIFY_OPTIONAL);
   
-  mbedtls_ssl_conf_rng(&ssl->conf, mbedtls_ctr_drbg_random, ctr);
+  mbedtls_ssl_conf_rng(&ssl->conf, mbedtls_ctr_drbg_random, drbg_ctx);
 #if defined(MBEDTLS_DEBUG_C)
   mbedtls_ssl_conf_dbg(&ssl->conf, my_debug, stdout);
 #endif
@@ -435,12 +403,12 @@ int CDECL ldg_ssl_init(my_ssl_context *ssl, mbedtls_ctr_drbg_context *ctr, int *
   mbedtls_ssl_conf_ca_chain(&ssl->conf, cacert, NULL);
   if (cert != NULL && pk != NULL)
   {
-    ret = mbedtls_ssl_conf_own_cert(&ssl->conf, cert, pk);
+    ret = mbedtls_ssl_conf_own_cert(&ssl->conf, cert, &pk->pk);
     if (ret != 0) { goto exit; }
   }
 
-#if defined(POLARSSL_SSL_SERVER_NAME_INDICATION)
-  ret = mbedtls_ssl_set_hostname(&ssl->ssl servername);
+#if defined(MBEDTLS_SSL_SERVER_NAME_INDICATION)
+  ret = mbedtls_ssl_set_hostname(&ssl->ssl, servername);
   if (ret != 0) { goto exit; }
 #endif
 
@@ -469,15 +437,18 @@ void CDECL ldg_ssl_set_ciphersuite(my_ssl_context *ssl, const int *wished_cipher
 
 int CDECL ldg_ssl_handshake(my_ssl_context *ssl)
 {
-  int ret = 0;
+  int ret;
   struct timeval timer;
+
+	ret = mbedtls_ssl_setup(&ssl->ssl, &ssl->conf);
+	if (ret != 0) { return ret; }
 
   if (used_tcp_layer == TCP_LAYER_MINTNET)
   {
     timer.tv_sec = 30;
     timer.tv_usec = 0;
     
-    setsockopt((int)(&ssl->ssl.p_bio), SOL_SOCKET, SO_RCVTIMEO, (void*)&timer, sizeof(timer));
+    setsockopt((int)(ssl->ssl.p_bio), SOL_SOCKET, SO_RCVTIMEO, (void*)&timer, sizeof(timer));
   }
 
   while (( ret = mbedtls_ssl_handshake(&ssl->ssl)) != 0) { if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) { break; } }
@@ -487,7 +458,7 @@ int CDECL ldg_ssl_handshake(my_ssl_context *ssl)
     timer.tv_sec = 0;
     timer.tv_usec = 0;
     
-    setsockopt((int)(&ssl->ssl.p_bio), SOL_SOCKET, SO_RCVTIMEO, (void*)&timer, sizeof(timer));
+    setsockopt((int)(ssl->ssl.p_bio), SOL_SOCKET, SO_RCVTIMEO, (void*)&timer, sizeof(timer));
   }
 
   return ret;
@@ -507,7 +478,7 @@ int CDECL ldg_ssl_write(my_ssl_context *ssl, const unsigned char *buf, size_t le
 
 int CDECL ldg_ssl_close_notify(my_ssl_context *ssl) { return mbedtls_ssl_close_notify(&ssl->ssl); }
 
-void CDECL ldg_ssl_free(my_ssl_context *ssl) { return mbedtls_ssl_free(&ssl->ssl); }
+void CDECL ldg_ssl_free(my_ssl_context *ssl) { mbedtls_ssl_free(&ssl->ssl); mbedtls_ssl_config_free(&ssl->conf); }
 
 /* ldg functions table */
 
@@ -529,28 +500,28 @@ PROC LibFunc[] =
   {"ldg_x509_crt_info", "int ldg_x509_crt_info(char *buf, size_t size, const x509_crt *crt);\n", ldg_x509_crt_info},
   {"ldg_x509_crt_free", "void ldg_x509_crt_free(x509_crt *crt);\n", ldg_x509_crt_free},
 
-  {"ldg_pk_init", "void ldg_pk_init(pk_context *pk);\n", ldg_pk_init},
-  {"ldg_pk_parse", "int ldg_pk_parse(pk_context *pk, const unsigned char *key, size_t keylen);\n", ldg_pk_parse},
-  {"ldg_pk_free", "void ldg_pk_free(pk_context *pk);\n", ldg_pk_free},
+  {"ldg_pk_init", "void ldg_pk_init(my_pk_context *pk);\n", ldg_pk_init},
+  {"ldg_pk_parse", "int ldg_pk_parse(my_pk_context *pk, const unsigned char *key, size_t keylen);\n", ldg_pk_parse},
+  {"ldg_pk_free", "void ldg_pk_free(my_pk_context *pk);\n", ldg_pk_free},
 
-  {"ldg_entropy_init", "int ldg_entropy_init(entropy_context *ctx, ctr_drbg_context *ctr, const char *app_name);\n", ldg_entropy_init},
-  {"ldg_entropy_free", "void ldg_entropy_free(entropy_context *ctx, ctr_drbg_context *ctr);\n", ldg_entropy_free},
+  {"ldg_entropy_init", "int ldg_entropy_init(entropy_context *entr_ctx, ctr_drbg_context *drbg_ctx, const char *app_name);\n", ldg_entropy_init},
+  {"ldg_entropy_free", "void ldg_entropy_free(entropy_context *entr_ctx, ctr_drbg_context *drbg_ctx);\n", ldg_entropy_free},
   
-  {"ldg_ssl_init", "int ldg_ssl_init(ssl_context *ssl, ctr_drbg_context *ctr, int *server_fd, const char *servername, x509_crt *cacert, x509_crt *cert, pk_context *pk);\n", ldg_ssl_init},
-  {"ldg_ssl_set_minmax_version", "int ldg_ssl_set_minmax_version(ssl_context *ssl, int min, int max);\n", ldg_ssl_set_minmax_version},
-  {"ldg_ssl_set_ciphersuite", "void ldg_ssl_set_ciphersuite(ssl_context *ssl, const int *wished_ciphersuites);\n", ldg_ssl_set_ciphersuite},
-  {"ldg_ssl_handshake", "int ldg_ssl_handshake(ssl_context *ssl);\n", ldg_ssl_handshake},
-  {"ldg_ssl_get_version", "const char* ldg_ssl_get_version(ssl_context *ssl);\n", ldg_ssl_get_version},
-  {"ldg_ssl_get_ciphersuite", "const char* ldg_ssl_get_ciphersuite(ssl_context *ssl);\n", ldg_ssl_get_ciphersuite},
-  {"ldg_ssl_get_verify_result", "int ldg_ssl_get_verify_result(ssl_context *ssl);\n", ldg_ssl_get_verify_result},
-  {"ldg_ssl_get_peer_cert", "const x509_crt* ldg_ssl_get_peer_cert(ssl_context *ssl);\n", ldg_ssl_get_peer_cert},
-  {"ldg_ssl_read", "int ldg_ssl_read( ssl_context *ssl, unsigned char *buf, size_t len);\n", ldg_ssl_read},
-  {"ldg_ssl_write", "int ldg_ssl_write(ssl_context *ssl, const unsigned char *buf, size_t len);\n", ldg_ssl_write},
-  {"ldg_ssl_close_notify", "int ldg_ssl_close_notify(ssl_context *ssl);\n", ldg_ssl_close_notify},
-  {"ldg_ssl_free", "void ldg_ssl_free(ssl_context *ssl);\n", ldg_ssl_free}
+  {"ldg_ssl_init", "int ldg_ssl_init(my_ssl_context *ssl, ctr_drbg_context *drbg_ctx, int *server_fd, const char *servername, x509_crt *cacert, x509_crt *cert, my_pk_context *pk);\n", ldg_ssl_init},
+  {"ldg_ssl_set_minmax_version", "int ldg_ssl_set_minmax_version(my_ssl_context *ssl, int min, int max);\n", ldg_ssl_set_minmax_version},
+  {"ldg_ssl_set_ciphersuite", "void ldg_ssl_set_ciphersuite(my_ssl_context *ssl, const int *wished_ciphersuites);\n", ldg_ssl_set_ciphersuite},
+  {"ldg_ssl_handshake", "int ldg_ssl_handshake(my_ssl_context *ssl);\n", ldg_ssl_handshake},
+  {"ldg_ssl_get_version", "const char* ldg_ssl_get_version(my_ssl_context *ssl);\n", ldg_ssl_get_version},
+  {"ldg_ssl_get_ciphersuite", "const char* ldg_ssl_get_ciphersuite(my_ssl_context *ssl);\n", ldg_ssl_get_ciphersuite},
+  {"ldg_ssl_get_verify_result", "int ldg_ssl_get_verify_result(my_ssl_context *ssl);\n", ldg_ssl_get_verify_result},
+  {"ldg_ssl_get_peer_cert", "const x509_crt* ldg_ssl_get_peer_cert(my_ssl_context *ssl);\n", ldg_ssl_get_peer_cert},
+  {"ldg_ssl_read", "int ldg_ssl_read( my_ssl_context *ssl, unsigned char *buf, size_t len);\n", ldg_ssl_read},
+  {"ldg_ssl_write", "int ldg_ssl_write(my_ssl_context *ssl, const unsigned char *buf, size_t len);\n", ldg_ssl_write},
+  {"ldg_ssl_close_notify", "int ldg_ssl_close_notify(my_ssl_context *ssl);\n", ldg_ssl_close_notify},
+  {"ldg_ssl_free", "void ldg_ssl_free(my_ssl_context *ssl);\n", ldg_ssl_free}
 };
 
-LDGLIB LibLdg[] = { { 0x0001,  29, LibFunc,  "SSL/TLS functions from mbebTLS 3.x", 1} };
+LDGLIB LibLdg[] = { { 0x0001,  29, LibFunc,  "SSL/TLS functions from mbebTLS 3.6.1", 1} };
 
 /* main function: init and memory configuration */
 
@@ -564,6 +535,8 @@ int main(void)
   (void)Cconws("mbedTLS.ldg (");
   (void)Cconws(get_version());
   (void)Cconws(") debug mode enabled\n\r");
+
+  mbedtls_debug_set_threshold(3); // 0 = nothing -> 3 = full
 #endif
 
   search_tcp_layer();
