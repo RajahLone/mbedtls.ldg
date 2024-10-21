@@ -136,7 +136,7 @@ void CDECL search_tcp_layer()
   if (xget_cookie(0x4D694E54L, NULL)) /* 'MiNT' */
   {
 #if defined(MBEDTLS_DEBUG_C)
-    (void)Cconws("MiNTnet detected\n\r");
+    (void)Cconws("MiNTnet detected\n");
 #endif
     timing_set_system(0);
     used_tcp_layer = TCP_LAYER_MINTNET;
@@ -144,14 +144,14 @@ void CDECL search_tcp_layer()
   else if (xget_cookie(0x4D616758L, NULL) && xget_cookie(0x53434B4DL, NULL)) /* 'MagX' and 'SCKM' */
   {
 #if defined(MBEDTLS_DEBUG_C)
-    (void)Cconws("MagiCNet detected\n\r");
+    (void)Cconws("MagiCNet detected\n");
 #endif
     used_tcp_layer = TCP_LAYER_MINTNET;
   }
   else if (xget_cookie(0x5354694BL, NULL)) /* 'STiK' */
   {
 #if defined(MBEDTLS_DEBUG_C)
-    (void)Cconws("STinG/STiK detected\n\r");
+    (void)Cconws("STinG/STiK detected\n");
 #endif
     used_tcp_layer = TCP_LAYER_STIK;
   }
@@ -164,7 +164,7 @@ short stick_init()
   if (xget_cookie(0x5354694BL, &cookieval) == 0)   /* 'STiK' */
   {
 #if defined(MBEDTLS_DEBUG_C)
-    (void)Cconws("STinG/STiK is not loaded or enabled!\n\r");
+    (void)Cconws("STinG/STiK is not loaded or enabled!\n");
 #endif
     return -1;
   }
@@ -174,7 +174,7 @@ short stick_init()
   if (strcmp(drivers->magic, MAGIC) != 0)
   {
 #if defined(MBEDTLS_DEBUG_C)
-    (void)Cconws("STinG/STiK structures corrupted!\n\r");
+    (void)Cconws("STinG/STiK structures corrupted!\n");
 #endif
     return -1;
   }
@@ -184,7 +184,7 @@ short stick_init()
   if (tpl == (TPL *)NULL)
   {
 #if defined(MBEDTLS_DEBUG_C)
-    (void)Cconws("Transport Driver not found!\n\r");
+    (void)Cconws("Transport Driver not found!\n");
 #endif
     return -1;
   }
