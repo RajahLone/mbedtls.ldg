@@ -8,7 +8,7 @@ Used by:
 - Meg, mailbox checker and spam eraser.  
 - Litchi, ftp client.  
 
-Targets: 68000, 68020-060, 68040, ColdFire
+Targets: 68000, 68020-060, ColdFire
 
 Other programs can use it, please read the how-to and functions calls in the st-guide documentation.
 
@@ -19,7 +19,6 @@ Other programs can use it, please read the how-to and functions calls in the st-
 - in an empty folder,  
    ```mkdir ./build/68000```  
    ```mkdir ./build/68020```  
-   ```mkdir ./build/68040```  
    ```mkdir ./build/ColdFire```  
 
 - get [mbedtls_r1_src.zip](https://ptonthat.fr/files/polarssl/mbedtls_r1_src.zip) and unpack the contents of /mbedtls.ldg/ to  
