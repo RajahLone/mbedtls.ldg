@@ -1,10 +1,15 @@
 
-CFLAGS  =  -Wall -O2 -fomit-frame-pointer -Wimplicit-function-declaration
+CFLAGS  =  -Wall -O2 -fomit-frame-pointer
 LDFLAGS = -s
-LDLIBS  = -lldg -lmbedtls -lmbedx509 -lmbedcrypto -lgem -lz
+LDLIBS  = -lldg -lmbedtls -lmbedx509 -lmbedcrypto -lgem 
 
 #
-# create manualy ./build/68000/ and ./build/68020/ and ./build/ColdFire/ folder for the targets to be placed.
+# create manually
+# ./build/68000/
+# ./build/68020/
+# ./build/68040/
+# ./build/ColdFire/
+# folders for the targets to be placed.
 #
 
 TARGET = mbedtls.ldg
@@ -46,9 +51,6 @@ all: $(TARGET)
 	$(STRIP) ./build/ColdFire/$(TARGET)
 	$(STACK) -S 128k ./build/ColdFire/$(TARGET)
 	rm -f ./build/ColdFire/*.o
-	$(STRIP) ./build/68040/$(TARGET)
-	$(STACK) -S 128k ./build/68040/$(TARGET)
-	rm -f ./build/68040/*.o
 	@echo All done
 
 clean:
@@ -58,8 +60,6 @@ clean:
 	-@rm -f ./build/68020/$(TARGET)
 	-@rm -f ./build/ColdFire/$(OBJS)
 	-@rm -f ./build/ColdFire/$(TARGET)
-	-@rm -f ./build/68040/$(OBJS)
-	-@rm -f ./build/68040/$(TARGET)
 	@echo Cleaned
 
 new: clean
@@ -74,10 +74,8 @@ new: clean
 	$(CC) $(CFLAGS) -m68000 -c $*.c -o ./build/68000/$*.o
 	$(CC) $(CFLAGS) -m68020-60 -c $*.c -o ./build/68020/$*.o
 	$(CC) $(CFLAGS) -mcpu=5475 -c $*.c -o ./build/ColdFire/$*.o
-	$(CC) $(CFLAGS) -m68040 -c $*.c -o ./build/68040/$*.o
 
 $(TARGET): $(OBJS)
 	$(CC) ./build/68000/*.o $(CFLAGS) -m68000 $(LDLIBS) -o ./build/68000/$(TARGET)
 	$(CC) ./build/68020/*.o $(CFLAGS) -m68020-60 $(LDLIBS) -o ./build/68020/$(TARGET)
 	$(CC) ./build/ColdFire/*.o $(CFLAGS) -mcpu=5475 $(LDLIBS) -o ./build/ColdFire/$(TARGET)
-	$(CC) ./build/68000/*.o $(CFLAGS) -m68040 $(LDLIBS) -o ./build/68040/$(TARGET)
