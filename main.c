@@ -28,6 +28,7 @@
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/version.h"
 #include "mbedtls/net_sockets.h"
+#include "mbedtls/timing_alt.h"
 
 #include "transprt.h"
 #include "ldg.h"
@@ -91,10 +92,22 @@ void CDECL set_aes_global(short *aes_global) { ldg_aes_global = aes_global; ldg_
 /* debug functions */
 
 #if defined(MBEDTLS_DEBUG_C)
-static void CDECL my_debug(void *ctx, int level, const char *filename, int line, const char *str)
+char lev[32];
+char lin[32];
+
+static void CDECL my_debug(void *dummy, int level, const char *filename, int line, const char *msg)
 {
-	(void) Cconws(str);
-  (void) Cconws("\r\n");
+  snprintf(lev, 32, "%d", level);
+  snprintf(lin, 32, "%d", line);
+
+	(void)Cconws(lin);
+	(void)Cconws(":");
+	(void)Cconws(lev);
+	(void)Cconws(": ");
+  (void)Cconws(msg);
+ 
+  size_t len = strlen(msg);
+  if (len > 1) { if (msg[len - 1] != '\n') { (void)Cconws("\n"); } }
 }
 #endif
 
@@ -534,7 +547,7 @@ int main(void)
 #if defined(MBEDTLS_DEBUG_C)
   (void)Cconws("mbedTLS.ldg (");
   (void)Cconws(get_version());
-  (void)Cconws(") debug mode enabled\n\r");
+  (void)Cconws(") debug mode enabled\n");
 
   mbedtls_debug_set_threshold(3); // 0 = nothing -> 3 = full
 #endif
