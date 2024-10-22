@@ -98,6 +98,7 @@ void CDECL set_aes_global(short *aes_global) { ldg_aes_global = aes_global; ldg_
 #if defined(MBEDTLS_DEBUG_C)
 char lev[32];
 char lin[32];
+char num[32];
 
 static void CDECL my_debug(void *dummy, int level, const char *filename, int line, const char *msg)
 {
@@ -556,9 +557,13 @@ int main(void)
   mbedtls_debug_set_threshold(3); // 0 = nothing -> 3 = full
 #endif
 #if defined(MBEDTLS_USE_PSA_CRYPTO)
-	if (psa_crypto_init() != PSA_SUCCESS)
+	int ret;
+	if ((ret = psa_crypto_init()) != PSA_SUCCESS)
 	{
-    (void)Cconws("0:1: psa_crypto_init() failed");
+   snprintf(num, 32, "%d", ret);
+   (void)Cconws("0:1: psa_crypto_init() failed - psa_error=");
+   (void)Cconws(num);
+   (void)Cconws("\n");
 	}
 #endif
 
