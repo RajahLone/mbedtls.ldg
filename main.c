@@ -404,11 +404,19 @@ int CDECL ldg_ssl_init(my_ssl_context *ssl, mbedtls_ctr_drbg_context *drbg_ctx, 
   if (ret != 0) { goto exit; }
   
   mbedtls_ssl_conf_authmode(&ssl->conf, (cacert == NULL) ? MBEDTLS_SSL_VERIFY_NONE : MBEDTLS_SSL_VERIFY_OPTIONAL);
-  
-  mbedtls_ssl_conf_rng(&ssl->conf, mbedtls_ctr_drbg_random, drbg_ctx);
+	mbedtls_ssl_conf_rng(&ssl->conf, mbedtls_ctr_drbg_random, drbg_ctx);
 #if defined(MBEDTLS_DEBUG_C)
   mbedtls_ssl_conf_dbg(&ssl->conf, my_debug, stdout);
 #endif
+	
+	ret = mbedtls_ssl_setup(&ssl->ssl, &ssl->conf);
+	if (ret != 0) { goto exit; }
+
+#if defined(MBEDTLS_SSL_SERVER_NAME_INDICATION)
+  ret = mbedtls_ssl_set_hostname(&ssl->ssl, servername);
+  if (ret != 0) { goto exit; }
+#endif
+
   if (used_tcp_layer == TCP_LAYER_STIK)
   {
     mbedtls_ssl_set_bio(&ssl->ssl, server_fd, my_stick_send, my_stick_recv, NULL);
@@ -423,11 +431,6 @@ int CDECL ldg_ssl_init(my_ssl_context *ssl, mbedtls_ctr_drbg_context *drbg_ctx, 
     ret = mbedtls_ssl_conf_own_cert(&ssl->conf, cert, &pk->pk);
     if (ret != 0) { goto exit; }
   }
-
-#if defined(MBEDTLS_SSL_SERVER_NAME_INDICATION)
-  ret = mbedtls_ssl_set_hostname(&ssl->ssl, servername);
-  if (ret != 0) { goto exit; }
-#endif
 
   return 0;
   
@@ -456,9 +459,6 @@ int CDECL ldg_ssl_handshake(my_ssl_context *ssl)
 {
   int ret;
   struct timeval timer;
-
-	ret = mbedtls_ssl_setup(&ssl->ssl, &ssl->conf);
-	if (ret != 0) { return ret; }
 
   if (used_tcp_layer == TCP_LAYER_MINTNET)
   {
@@ -548,15 +548,18 @@ int main(void)
   
   mbedtls_platform_set_calloc_free((void *)ldg_Malloc, (void *)ldg_Free);
   
-#if defined(MBEDTLS_USE_PSA_CRYPTO)
-  psa_crypto_init();
-#endif
 #if defined(MBEDTLS_DEBUG_C)
   (void)Cconws("\n\nmbedTLS.ldg (");
   (void)Cconws(get_version());
   (void)Cconws(") debug mode enabled\n");
 
   mbedtls_debug_set_threshold(3); // 0 = nothing -> 3 = full
+#endif
+#if defined(MBEDTLS_USE_PSA_CRYPTO)
+	if (psa_crypto_init() != PSA_SUCCESS)
+	{
+    (void)Cconws("0:1: psa_crypto_init() failed");
+	}
 #endif
 
   search_tcp_layer();
