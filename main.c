@@ -5,8 +5,12 @@
 #include MBEDTLS_CONFIG_FILE
 #endif
 
+// important defines, already defined in mbedtls/mbedtls_config.h
+//
 #define MBEDTLS_DEBUG_C
+#define MBEDTLS_HAVE_INT32
 #define MBEDTLS_ALLOW_PRIVATE_ACCESS
+#define MBEDTLS_USE_PSA_CRYPTO
 
 #include <string.h>
 #include <stdlib.h>
@@ -541,11 +545,14 @@ LDGLIB LibLdg[] = { { 0x0001,  29, LibFunc,  "SSL/TLS functions from mbebTLS 3.6
 int main(void)
 {
   ldg_init(LibLdg);
-
+  
   mbedtls_platform_set_calloc_free((void *)ldg_Malloc, (void *)ldg_Free);
   
+#if defined(MBEDTLS_USE_PSA_CRYPTO)
+  psa_crypto_init();
+#endif
 #if defined(MBEDTLS_DEBUG_C)
-  (void)Cconws("mbedTLS.ldg (");
+  (void)Cconws("\n\nmbedTLS.ldg (");
   (void)Cconws(get_version());
   (void)Cconws(") debug mode enabled\n");
 
