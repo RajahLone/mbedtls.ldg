@@ -377,16 +377,36 @@ unsigned long CDECL get_sizeof_ctr_drbg_context_struct() { return (unsigned long
 
 int ldg_entropy_init(mbedtls_entropy_context *entr_ctx, mbedtls_ctr_drbg_context *drbg_ctx, const char *app_name)
 {
+	int ret;
+
   mbedtls_ctr_drbg_init(drbg_ctx);
   mbedtls_entropy_init(entr_ctx);
+
+#if defined(MBEDTLS_USE_PSA_CRYPTO)
+	if ((ret = psa_crypto_init()) != PSA_SUCCESS)
+	{
+#if defined(MBEDTLS_DEBUG_C)
+   snprintf(num, 32, "%d", ret);
+   (void)Cconws("0:1: psa_crypto_init() failed - psa_error=");
+   (void)Cconws(num);
+   (void)Cconws("\n");
+#endif
+	}
+#endif
+
+  ret = mbedtls_ctr_drbg_seed(drbg_ctx, mbedtls_entropy_func, entr_ctx, (const unsigned char *) app_name, strlen(app_name));
   
-  return mbedtls_ctr_drbg_seed(drbg_ctx, mbedtls_entropy_func, entr_ctx, (const unsigned char *) app_name, strlen(app_name));
+  return ret;
 }
 
 void CDECL ldg_entropy_free(mbedtls_entropy_context *entr_ctx, mbedtls_ctr_drbg_context *drbg_ctx)
 {
   if (drbg_ctx != NULL) { mbedtls_ctr_drbg_free(drbg_ctx); }
   if (entr_ctx != NULL) { mbedtls_entropy_free(entr_ctx); }
+
+#if defined(MBEDTLS_USE_PSA_CRYPTO)
+	mbedtls_psa_crypto_free();
+#endif
 }
 
 /* ssl layer functions */
@@ -410,9 +430,6 @@ int CDECL ldg_ssl_init(my_ssl_context *ssl, mbedtls_ctr_drbg_context *drbg_ctx, 
   mbedtls_ssl_conf_dbg(&ssl->conf, my_debug, stdout);
 #endif
 	
-	ret = mbedtls_ssl_setup(&ssl->ssl, &ssl->conf);
-	if (ret != 0) { goto exit; }
-
 #if defined(MBEDTLS_SSL_SERVER_NAME_INDICATION)
   ret = mbedtls_ssl_set_hostname(&ssl->ssl, servername);
   if (ret != 0) { goto exit; }
@@ -436,6 +453,12 @@ int CDECL ldg_ssl_init(my_ssl_context *ssl, mbedtls_ctr_drbg_context *drbg_ctx, 
   return 0;
   
 exit: // th-otto
+#if defined(MBEDTLS_DEBUG_C)
+	snprintf(num, 32, "%d", ret);
+  (void)Cconws("0:1: ssl initialization failed - error=");
+	(void)Cconws(num);
+	(void)Cconws("\n");
+#endif
   mbedtls_ssl_free(&ssl->ssl);
   mbedtls_ssl_config_free(&ssl->conf);
   return ret;
@@ -460,6 +483,9 @@ int CDECL ldg_ssl_handshake(my_ssl_context *ssl)
 {
   int ret;
   struct timeval timer;
+
+	ret = mbedtls_ssl_setup(&ssl->ssl, &ssl->conf);
+	if (ret != 0) { return ret; }
 
   if (used_tcp_layer == TCP_LAYER_MINTNET)
   {
@@ -546,25 +572,13 @@ LDGLIB LibLdg[] = { { 0x0001,  29, LibFunc,  "SSL/TLS functions from mbebTLS 3.6
 int main(void)
 {
   ldg_init(LibLdg);
-  
-  mbedtls_platform_set_calloc_free((void *)ldg_Malloc, (void *)ldg_Free);
-  
+    
 #if defined(MBEDTLS_DEBUG_C)
   (void)Cconws("\n\nmbedTLS.ldg (");
   (void)Cconws(get_version());
   (void)Cconws(") debug mode enabled\n");
 
   mbedtls_debug_set_threshold(3); // 0 = nothing -> 3 = full
-#endif
-#if defined(MBEDTLS_USE_PSA_CRYPTO)
-	int ret;
-	if ((ret = psa_crypto_init()) != PSA_SUCCESS)
-	{
-   snprintf(num, 32, "%d", ret);
-   (void)Cconws("0:1: psa_crypto_init() failed - psa_error=");
-   (void)Cconws(num);
-   (void)Cconws("\n");
-	}
 #endif
 
   search_tcp_layer();
