@@ -7,7 +7,7 @@
 
 // important defines, already defined in mbedtls/mbedtls_config.h
 //
-#define MBEDTLS_DEBUG_C
+//#define MBEDTLS_DEBUG_C
 #define MBEDTLS_HAVE_INT32
 #define MBEDTLS_ALLOW_PRIVATE_ACCESS
 #define MBEDTLS_USE_PSA_CRYPTO
