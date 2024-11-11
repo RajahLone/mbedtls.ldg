@@ -21,7 +21,7 @@ Other programs can use it, please read the how-to and functions calls in the st-
    ```mkdir ./build/68020```  
    ```mkdir ./build/ColdFire```  
 
-- get [mbedtls_r2_src.zip](https://ptonthat.fr/files/polarssl/mbedtls_r2_src.zip) and unpack the contents of /mbedtls.ldg/ to  
+- get [mbedtls_r2_src.zip](https://ptonthat.fr/files/polarssl/sources/mbedtls.ldg.r2.zip) and unpack the contents of /mbedtls.ldg/ to  
    ```./README.md```  
    ```./Makefile```  
    ```./main.c```  
