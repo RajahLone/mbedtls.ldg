@@ -1,6 +1,6 @@
 # mbedTLS.ldg
 
-Library using the LDG system and the mbedTLS 3.6.3 library.
+Library using the LDG system and the mbedTLS 3.6.4 library.
 Brings SSL/TLS layer (recent TLSv1.2 TLSv1.3) to clients applications using MiNTnet and STinG/STiK TCP layers.
 
 Used by:  
@@ -21,7 +21,7 @@ Other programs can use it, please read the how-to and functions calls in the st-
    ```mkdir ./build/68020```  
    ```mkdir ./build/ColdFire```  
 
-- get [mbedtls.ldg.r3.zip](https://ptonthat.fr/files/polarssl/sources/mbedtls.ldg.r3.zip) and unpack the contents of /mbedtls.ldg/ to  
+- get [mbedtls.ldg.r4.zip](https://ptonthat.fr/files/polarssl/sources/mbedtls.ldg.r4.zip) and unpack the contents of /mbedtls.ldg/ to  
    ```./README.md```  
    ```./Makefile```  
    ```./main.c```  
